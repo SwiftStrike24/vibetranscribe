@@ -1,101 +1,147 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import dynamic from 'next/dynamic';
+import { setupKeyboardShortcuts } from "@/utils/keyboardShortcuts";
+import ClientOnly from "@/components/ClientOnly";
+
+// Dynamically import components with no SSR
+const Recorder = dynamic(() => import('@/components/Recorder'), { ssr: false });
+const Transcriber = dynamic(() => import('@/components/Transcriber'), { ssr: false });
+const Visualizer = dynamic(() => import('@/components/Visualizer'), { ssr: false });
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [transcribedText, setTranscribedText] = useState<string>("");
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Set isMounted to true once component mounts
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Setup keyboard shortcuts
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const cleanup = setupKeyboardShortcuts(
+      // Start recording handler
+      () => {
+        if (!isRecording && !isTranscribing) {
+          setIsRecording(true);
+          showTemporaryNotification("Recording started. Press Esc to stop.");
+        }
+      },
+      // Stop recording handler
+      () => {
+        if (isRecording) {
+          setIsRecording(false);
+          showTemporaryNotification("Recording stopped. Transcribing...");
+        }
+      }
+    );
+
+    return cleanup;
+  }, [isRecording, isTranscribing, isMounted]);
+
+  // Handle recording completion
+  const handleRecordingComplete = (blob: Blob) => {
+    setAudioBlob(blob);
+  };
+
+  // Handle transcription start
+  const handleTranscriptionStart = () => {
+    setIsTranscribing(true);
+  };
+
+  // Handle transcription completion
+  const handleTranscriptionComplete = (text: string) => {
+    setTranscribedText(text);
+    setIsTranscribing(false);
+    
+    // Copy to clipboard (only in browser)
+    if (isMounted && navigator.clipboard) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          showTemporaryNotification("Transcription copied to clipboard!");
+        })
+        .catch((err) => {
+          console.error("Could not copy text: ", err);
+          showTemporaryNotification("Failed to copy to clipboard.");
+        });
+    }
+  };
+
+  // Show a temporary notification
+  const showTemporaryNotification = (message: string) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl space-y-4">
+        <h1 className="text-2xl font-bold text-white text-center mb-8">
+          VibeTranscribe
+          <span className="text-violet-400 ml-2">🎙️</span>
+        </h1>
+        
+        <div className="text-center mb-8">
+          <p className="text-neutral-400 text-sm text-center mt-4">
+            Press <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Ctrl</kbd> +{" "}
+            <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Alt</kbd> +{" "}
+            <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">R</kbd> to start recording
+          </p>
+          <p className="text-neutral-400 text-sm text-center mt-2">
+            Press <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Esc</kbd> to stop recording
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        
+        {transcribedText && (
+          <div className="w-full p-4 bg-neutral-800 rounded-lg">
+            <h2 className="text-xl font-semibold mb-2 text-white">Last Transcription:</h2>
+            <p className="text-neutral-200">{transcribedText}</p>
+          </div>
+        )}
+        
+        {/* Notification */}
+        {showNotification && (
+          <div className="fixed top-4 right-4 bg-violet-600 text-white px-4 py-2 rounded-md shadow-lg">
+            {notificationMessage}
+          </div>
+        )}
+      </div>
+      
+      {/* Client-only components */}
+      <ClientOnly>
+        {/* Recorder component (invisible) */}
+        <Recorder 
+          onRecordingComplete={handleRecordingComplete}
+          isRecording={isRecording}
+          setIsRecording={setIsRecording}
+        />
+        
+        {/* Transcriber component */}
+        {audioBlob && (
+          <Transcriber 
+            audioBlob={audioBlob}
+            onTranscriptionComplete={handleTranscriptionComplete}
+            onTranscriptionStart={handleTranscriptionStart}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        )}
+        
+        {/* Visualizer component */}
+        <Visualizer isRecording={isRecording} />
+      </ClientOnly>
     </div>
   );
 }
+
