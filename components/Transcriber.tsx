@@ -22,34 +22,78 @@ export default function Transcriber({ audioBlob, onTranscriptionComplete, onTran
   const transcribeAudio = useCallback(async (blob: Blob) => {
     if (!blob || !isMounted) return;
     
+    console.log("Starting transcription process with blob size:", blob.size);
+    console.log("Blob type:", blob.type);
     setIsTranscribing(true);
     setError(null);
     onTranscriptionStart();
 
     try {
-      // Convert blob to File object
-      const file = new File([blob], "recording.wav", { type: "audio/wav" });
+      // Validate the blob
+      if (blob.size === 0) {
+        throw new Error("Audio recording is empty. Please try recording again.");
+      }
+      
+      // Convert blob to File object with the correct extension based on the MIME type
+      const fileExtension = blob.type.includes('webm') ? 'webm' : 
+                           blob.type.includes('mp4') ? 'mp4' : 
+                           blob.type.includes('ogg') ? 'ogg' : 'wav';
+      
+      const fileName = `recording.${fileExtension}`;
+      console.log("Creating file with name:", fileName, "and type:", blob.type);
+      
+      const file = new File([blob], fileName, { type: blob.type || 'audio/webm' });
+      console.log("Created file object:", file.name, "Size:", file.size);
       
       // Create a FormData object to send the file
       const formData = new FormData();
       formData.append("file", file);
       formData.append("model", "whisper-1");
       
+      console.log("Sending request to transcription API...");
       // Make a request to our API route that will handle the OpenAI API call
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
       });
       
+      console.log("API response status:", response.status);
+      
+      // Get the response data
+      const data = await response.json();
+      
+      // Check if the response contains an error
       if (!response.ok) {
-        throw new Error(`Transcription failed: ${response.statusText}`);
+        const errorMessage = data.error || `Transcription failed: ${response.statusText}`;
+        console.error("API error:", errorMessage);
+        throw new Error(errorMessage);
       }
       
-      const data = await response.json();
+      // Check if we have text in the response
+      if (!data.text) {
+        console.error("API returned no text:", data);
+        throw new Error("Transcription returned empty text. Please try again.");
+      }
+      
+      console.log("Transcription successful, text length:", data.text.length);
       onTranscriptionComplete(data.text);
     } catch (err) {
       console.error("Transcription error:", err);
-      setError(err instanceof Error ? err.message : "Unknown error occurred");
+      
+      // Provide a user-friendly error message
+      let errorMessage = "An error occurred during transcription. Please try again.";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      // Set the error state
+      setError(errorMessage);
+      
+      // Also notify the parent component about the error
+      onTranscriptionComplete("Error: " + errorMessage);
     } finally {
       setIsTranscribing(false);
     }
@@ -69,7 +113,7 @@ export default function Transcriber({ audioBlob, onTranscriptionComplete, onTran
   return (
     <div className="transcriber">
       {isTranscribing && <p>Transcribing...</p>}
-      {error && <p className="error">Error: {error}</p>}
+      {error && <p className="error text-red-500">Error: {error}</p>}
     </div>
   );
 } 

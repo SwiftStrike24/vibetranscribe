@@ -1,12 +1,9 @@
 'use client';
 
-import { KeyboardEvent } from '@/types/keyboard';
-
-// Import keyboard.js directly
-// We're using 'use client' directive to ensure this only runs on the client
-import keyboard from 'keyboardjs';
-
 type ShortcutHandler = () => void;
+
+// Keep track of whether keyboard shortcuts are set up
+let isInitialized = false;
 
 export const setupKeyboardShortcuts = (
   startRecordingHandler: ShortcutHandler,
@@ -14,24 +11,44 @@ export const setupKeyboardShortcuts = (
 ) => {
   // Only run on the client side
   if (typeof window === 'undefined') {
+    console.log('Not in browser environment, skipping keyboard setup');
     return () => {}; // Return empty cleanup function for SSR
   }
-  
-  // Bind Ctrl + Alt + R to toggle recording
-  keyboard.bind('ctrl + alt + r', (e: KeyboardEvent) => {
-    e.preventDefault();
-    startRecordingHandler();
-  });
 
-  // Bind Escape to stop recording
-  keyboard.bind('escape', (e: KeyboardEvent) => {
-    e.preventDefault();
-    stopRecordingHandler();
-  });
+  // Avoid setting up multiple event listeners
+  if (isInitialized) {
+    console.log('Keyboard shortcuts already initialized');
+    return () => {}; // Return empty cleanup function
+  }
+
+  console.log('Setting up keyboard shortcuts with native event listeners');
+
+  // Function to handle keydown events
+  const handleKeyDown = (event: KeyboardEvent) => {
+    // Check for Ctrl+Alt+R
+    if (event.ctrlKey && event.altKey && event.key === 'r') {
+      console.log('Ctrl+Alt+R pressed!');
+      event.preventDefault();
+      startRecordingHandler();
+    }
+    
+    // Check for Escape
+    if (event.key === 'Escape') {
+      console.log('Escape pressed!');
+      event.preventDefault();
+      stopRecordingHandler();
+    }
+  };
+
+  // Add the event listener
+  window.addEventListener('keydown', handleKeyDown);
+  isInitialized = true;
+  console.log('Keyboard shortcuts set up successfully');
 
   // Return a cleanup function
   return () => {
-    keyboard.unbind('ctrl + alt + r');
-    keyboard.unbind('escape');
+    console.log('Cleaning up keyboard shortcuts');
+    window.removeEventListener('keydown', handleKeyDown);
+    isInitialized = false;
   };
 }; 

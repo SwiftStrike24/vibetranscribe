@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from 'next/dynamic';
 import { setupKeyboardShortcuts } from "@/utils/keyboardShortcuts";
 import ClientOnly from "@/components/ClientOnly";
@@ -18,48 +18,97 @@ export default function Home() {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
   const [isMounted, setIsMounted] = useState(false);
+  
+  // Use a ref for notification timer to avoid memory leaks
+  const notificationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Show a temporary notification
+  const showTemporaryNotification = useCallback((message: string) => {
+    console.log("Showing notification:", message);
+    
+    // Clear any existing timer
+    if (notificationTimerRef.current) {
+      clearTimeout(notificationTimerRef.current);
+      notificationTimerRef.current = null;
+    }
+    
+    setNotificationMessage(message);
+    setShowNotification(true);
+    
+    notificationTimerRef.current = setTimeout(() => {
+      setShowNotification(false);
+      notificationTimerRef.current = null;
+    }, 3000);
+  }, []);
 
   // Set isMounted to true once component mounts
   useEffect(() => {
     setIsMounted(true);
+    console.log("Component mounted");
+    
+    // Clean up notification timer on unmount
+    return () => {
+      if (notificationTimerRef.current) {
+        clearTimeout(notificationTimerRef.current);
+      }
+    };
   }, []);
+
+  // Define handlers as useCallbacks to avoid recreating them on every render
+  const startRecordingHandler = useCallback(() => {
+    console.log("Start recording handler called");
+    if (!isRecording && !isTranscribing) {
+      console.log("Starting recording...");
+      setIsRecording(true);
+      showTemporaryNotification("Recording started. Press Esc to stop.");
+    } else {
+      console.log("Cannot start recording: already recording or transcribing");
+    }
+  }, [isRecording, isTranscribing, showTemporaryNotification]);
+
+  const stopRecordingHandler = useCallback(() => {
+    console.log("Stop recording handler called");
+    if (isRecording) {
+      console.log("Stopping recording...");
+      setIsRecording(false);
+      showTemporaryNotification("Recording stopped. Transcribing...");
+    } else {
+      console.log("Cannot stop recording: not currently recording");
+    }
+  }, [isRecording, showTemporaryNotification]);
 
   // Setup keyboard shortcuts
   useEffect(() => {
     if (!isMounted) return;
 
+    console.log("Setting up keyboard shortcuts");
     const cleanup = setupKeyboardShortcuts(
-      // Start recording handler
-      () => {
-        if (!isRecording && !isTranscribing) {
-          setIsRecording(true);
-          showTemporaryNotification("Recording started. Press Esc to stop.");
-        }
-      },
-      // Stop recording handler
-      () => {
-        if (isRecording) {
-          setIsRecording(false);
-          showTemporaryNotification("Recording stopped. Transcribing...");
-        }
-      }
+      startRecordingHandler,
+      stopRecordingHandler
     );
 
-    return cleanup;
-  }, [isRecording, isTranscribing, isMounted]);
+    // Return cleanup function
+    return () => {
+      console.log("Cleaning up keyboard shortcuts");
+      cleanup();
+    };
+  }, [isMounted, startRecordingHandler, stopRecordingHandler]);
 
   // Handle recording completion
-  const handleRecordingComplete = (blob: Blob) => {
+  const handleRecordingComplete = useCallback((blob: Blob) => {
+    console.log("Recording complete, blob size:", blob.size);
     setAudioBlob(blob);
-  };
+  }, []);
 
   // Handle transcription start
-  const handleTranscriptionStart = () => {
+  const handleTranscriptionStart = useCallback(() => {
+    console.log("Transcription started");
     setIsTranscribing(true);
-  };
+  }, []);
 
   // Handle transcription completion
-  const handleTranscriptionComplete = (text: string) => {
+  const handleTranscriptionComplete = useCallback((text: string) => {
+    console.log("Transcription complete:", text);
     setTranscribedText(text);
     setIsTranscribing(false);
     
@@ -67,6 +116,7 @@ export default function Home() {
     if (isMounted && navigator.clipboard) {
       navigator.clipboard.writeText(text)
         .then(() => {
+          console.log("Text copied to clipboard");
           showTemporaryNotification("Transcription copied to clipboard!");
         })
         .catch((err) => {
@@ -74,16 +124,15 @@ export default function Home() {
           showTemporaryNotification("Failed to copy to clipboard.");
         });
     }
+  }, [isMounted, showTemporaryNotification]);
+
+  // Add a manual trigger for testing
+  const handleManualStartRecording = () => {
+    startRecordingHandler();
   };
 
-  // Show a temporary notification
-  const showTemporaryNotification = (message: string) => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 3000);
+  const handleManualStopRecording = () => {
+    stopRecordingHandler();
   };
 
   return (
@@ -103,6 +152,40 @@ export default function Home() {
           <p className="text-neutral-400 text-sm text-center mt-2">
             Press <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Esc</kbd> to stop recording
           </p>
+          
+          {/* Manual buttons for testing */}
+          <div className="mt-4 flex justify-center space-x-4">
+            <button
+              onClick={handleManualStartRecording}
+              disabled={isRecording || isTranscribing}
+              className={`px-4 py-2 rounded-md ${
+                isRecording || isTranscribing
+                  ? "bg-neutral-700 text-neutral-400 cursor-not-allowed"
+                  : "bg-violet-600 text-white hover:bg-violet-700"
+              }`}
+            >
+              Start Recording
+            </button>
+            <button
+              onClick={handleManualStopRecording}
+              disabled={!isRecording}
+              className={`px-4 py-2 rounded-md ${
+                !isRecording
+                  ? "bg-neutral-700 text-neutral-400 cursor-not-allowed"
+                  : "bg-red-600 text-white hover:bg-red-700"
+              }`}
+            >
+              Stop Recording
+            </button>
+          </div>
+          
+          {/* Recording status */}
+          {isRecording && (
+            <p className="mt-4 text-violet-400 animate-pulse">Recording in progress...</p>
+          )}
+          {isTranscribing && (
+            <p className="mt-4 text-blue-400">Transcribing...</p>
+          )}
         </div>
         
         {transcribedText && (
