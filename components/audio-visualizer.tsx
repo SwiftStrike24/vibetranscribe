@@ -1,135 +1,204 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 
 interface AudioVisualizerProps {
-  isRecording?: boolean
+  isRecording: boolean
 }
 
-export function AudioVisualizerComponent({ isRecording = false }: AudioVisualizerProps) {
+// Define WebKit AudioContext type
+interface WebkitWindow extends Window {
+  webkitAudioContext: typeof AudioContext
+}
+
+export default function AudioVisualizer({ isRecording }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number | undefined>(undefined)
-  const analyserRef = useRef<AnalyserNode | undefined>(undefined)
-  const dataArrayRef = useRef<Uint8Array | undefined>(undefined)
-  const [isMounted, setIsMounted] = useState(false)
-
-  // Set isMounted to true once component mounts
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
+  const animationRef = useRef<number | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const dataArrayRef = useRef<Uint8Array | null>(null)
 
   useEffect(() => {
-    if (!isRecording || !isMounted) return
+    let audioContext: AudioContext | null = null
+    let mediaStream: MediaStream | null = null
+    let source: MediaStreamAudioSourceNode | null = null
 
-    let cleanupFunction = () => {}
-
-    const setupAudio = async () => {
+    const setupAudioContext = async () => {
       try {
-        // Check if we're in the browser and have access to the required APIs
-        if (typeof window === 'undefined' || !window.AudioContext || !navigator.mediaDevices) {
-          console.error("Audio APIs not available")
-          return
-        }
+        if (!isRecording) return
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        const audioContext = new AudioContext()
-        const source = audioContext.createMediaStreamSource(stream)
+        // Create audio context with proper typing
+        const AudioContextClass = window.AudioContext || 
+          (window as unknown as WebkitWindow).webkitAudioContext
+        audioContext = new AudioContextClass()
+        
+        // Get user media
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        
+        // Create source from media stream
+        source = audioContext.createMediaStreamSource(mediaStream)
+        
+        // Create analyser
         const analyser = audioContext.createAnalyser()
-
         analyser.fftSize = 256
-        source.connect(analyser)
         analyserRef.current = analyser
-
+        
+        // Connect source to analyser
+        source.connect(analyser)
+        
+        // Create data array for frequency data
         const bufferLength = analyser.frequencyBinCount
-        dataArrayRef.current = new Uint8Array(bufferLength)
-
-        animate()
-
-        // Define cleanup for this effect
-        cleanupFunction = () => {
-          if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current)
-          }
-          // Close audio context and stop tracks
-          if (audioContext.state !== 'closed') {
-            audioContext.close()
-          }
-          stream.getTracks().forEach(track => track.stop())
-        }
+        const dataArray = new Uint8Array(bufferLength)
+        dataArrayRef.current = dataArray
+        
+        // Start animation
+        startAnimation()
       } catch (error) {
-        console.error("Error accessing microphone:", error)
+        console.error("Error setting up audio context:", error)
       }
     }
 
-    setupAudio()
-
-    // Return cleanup function
-    return () => cleanupFunction()
-  }, [isRecording, isMounted])
-
-  const animate = () => {
-    const canvas = canvasRef.current
-    const analyser = analyserRef.current
-    const dataArray = dataArrayRef.current
-
-    if (!canvas || !analyser || !dataArray) return
-
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    const draw = () => {
-      const WIDTH = canvas.width
-      const HEIGHT = canvas.height
-
-      analyser.getByteFrequencyData(dataArray)
-
-      ctx.fillStyle = "rgb(17, 17, 17)" // Dark background
-      ctx.fillRect(0, 0, WIDTH, HEIGHT)
-
-      const barWidth = (WIDTH / dataArray.length) * 2.5
-      let barHeight
-      let x = 0
-
-      for (let i = 0; i < dataArray.length; i++) {
-        barHeight = dataArray[i] / 2
-
-        // Create gradient for bars
-        const gradient = ctx.createLinearGradient(0, HEIGHT - barHeight, 0, HEIGHT)
-        gradient.addColorStop(0, "rgba(167, 139, 250, 0.8)") // Lighter purple
-        gradient.addColorStop(1, "rgba(139, 92, 246, 0.5)") // Darker purple
-
-        ctx.fillStyle = gradient
-        ctx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight)
-
-        x += barWidth + 1
+    const startAnimation = () => {
+      if (!canvasRef.current || !analyserRef.current || !dataArrayRef.current) return
+      
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return
+      
+      const analyser = analyserRef.current
+      const dataArray = dataArrayRef.current
+      
+      // Set canvas dimensions
+      canvas.width = canvas.offsetWidth
+      canvas.height = canvas.offsetHeight
+      
+      const draw = () => {
+        if (!isRecording) return
+        
+        // Request next animation frame
+        animationRef.current = requestAnimationFrame(draw)
+        
+        // Get frequency data
+        analyser.getByteFrequencyData(dataArray)
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        
+        // Set bar width based on canvas width and number of bars
+        const barCount = 64 // Number of bars to display
+        const barWidth = canvas.width / barCount
+        const barSpacing = 2 // Space between bars
+        const barWidthWithSpacing = barWidth - barSpacing
+        
+        // Calculate center of canvas for symmetrical visualization
+        const centerY = canvas.height / 2
+        
+        // Draw bars
+        for (let i = 0; i < barCount; i++) {
+          // Use a subset of the frequency data
+          const dataIndex = Math.floor(i * (dataArray.length / barCount))
+          const value = dataArray[dataIndex]
+          
+          // Calculate bar height based on frequency value (0-255)
+          const barHeight = (value / 255) * (canvas.height / 2) * 0.8
+          
+          // Calculate x position
+          const x = i * barWidth
+          
+          // Create gradient for bars
+          const gradient = ctx.createLinearGradient(0, centerY - barHeight, 0, centerY + barHeight)
+          gradient.addColorStop(0, 'rgba(167, 139, 250, 1)') // violet-400
+          gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.8)') // violet-500
+          gradient.addColorStop(1, 'rgba(167, 139, 250, 1)') // violet-400
+          
+          ctx.fillStyle = gradient
+          
+          // Draw bar (mirrored around center)
+          ctx.beginPath()
+          
+          // Top bar (rounded top)
+          ctx.moveTo(x, centerY - barHeight)
+          ctx.lineTo(x, centerY - 2)
+          ctx.lineTo(x + barWidthWithSpacing, centerY - 2)
+          ctx.lineTo(x + barWidthWithSpacing, centerY - barHeight)
+          
+          // Add rounded top
+          ctx.arc(
+            x + barWidthWithSpacing / 2, 
+            centerY - barHeight, 
+            barWidthWithSpacing / 2, 
+            0, 
+            Math.PI, 
+            true
+          )
+          
+          ctx.fill()
+          
+          // Bottom bar (rounded bottom)
+          ctx.beginPath()
+          ctx.moveTo(x, centerY + 2)
+          ctx.lineTo(x, centerY + barHeight)
+          ctx.lineTo(x + barWidthWithSpacing, centerY + barHeight)
+          ctx.lineTo(x + barWidthWithSpacing, centerY + 2)
+          
+          // Add rounded bottom
+          ctx.arc(
+            x + barWidthWithSpacing / 2, 
+            centerY + barHeight, 
+            barWidthWithSpacing / 2, 
+            0, 
+            Math.PI, 
+            false
+          )
+          
+          ctx.fill()
+        }
+        
+        // Draw center line
+        ctx.beginPath()
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.3)'
+        ctx.lineWidth = 2
+        ctx.moveTo(0, centerY)
+        ctx.lineTo(canvas.width, centerY)
+        ctx.stroke()
       }
-
-      animationRef.current = requestAnimationFrame(draw)
+      
+      // Start animation loop
+      draw()
     }
 
-    draw()
-  }
+    const cleanup = () => {
+      // Cancel animation frame
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+        animationRef.current = null
+      }
+      
+      // Stop media stream tracks
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop())
+      }
+      
+      // Close audio context
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close()
+      }
+    }
 
-  // Only render the canvas on the client side
-  if (!isMounted) {
-    return (
-      <div className="relative w-full h-48 bg-neutral-900 rounded-xl overflow-hidden shadow-lg">
-        <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
-          <p className="text-sm font-medium">Loading visualizer...</p>
-        </div>
-      </div>
-    )
-  }
+    if (isRecording) {
+      setupAudioContext()
+    } else {
+      cleanup()
+    }
+
+    // Cleanup on unmount
+    return cleanup
+  }, [isRecording])
 
   return (
-    <div className="relative w-full h-48 bg-neutral-900 rounded-xl overflow-hidden shadow-lg">
-      <div className="absolute inset-0 bg-gradient-to-b from-violet-500/10 to-transparent pointer-events-none" />
-      <canvas ref={canvasRef} width={800} height={192} className="w-full h-full" />
-      {!isRecording && (
-        <div className="absolute inset-0 flex items-center justify-center text-neutral-400">
-          <p className="text-sm font-medium">Waiting for audio input...</p>
-        </div>
-      )}
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center p-4 pointer-events-none">
+      <div className={`w-full max-w-md h-24 bg-neutral-800/80 backdrop-blur-md rounded-t-xl overflow-hidden transition-all duration-300 ease-in-out ${isRecording ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'}`}>
+        <canvas ref={canvasRef} className="w-full h-full" />
+      </div>
     </div>
   )
 }

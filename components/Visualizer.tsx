@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AudioVisualizerComponent } from "./audio-visualizer";
+import dynamic from 'next/dynamic';
+
+// Dynamically import the AudioVisualizer component
+const AudioVisualizer = dynamic(() => import('./audio-visualizer'), { ssr: false });
 
 interface VisualizerProps {
   isRecording: boolean;
@@ -19,9 +22,5 @@ export default function Visualizer({ isRecording }: VisualizerProps) {
     return null;
   }
 
-  return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-96 z-50">
-      <AudioVisualizerComponent isRecording={isRecording} />
-    </div>
-  );
+  return <AudioVisualizer isRecording={isRecording} />;
 } 

@@ -6,9 +6,15 @@ interface TranscriberProps {
   audioBlob: Blob | null;
   onTranscriptionComplete: (text: string) => void;
   onTranscriptionStart: () => void;
+  onTranscriptionProgress?: (text: string) => void;
 }
 
-export default function Transcriber({ audioBlob, onTranscriptionComplete, onTranscriptionStart }: TranscriberProps) {
+export default function Transcriber({ 
+  audioBlob, 
+  onTranscriptionComplete, 
+  onTranscriptionStart,
+  onTranscriptionProgress 
+}: TranscriberProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -50,6 +56,11 @@ export default function Transcriber({ audioBlob, onTranscriptionComplete, onTran
       formData.append("file", file);
       formData.append("model", "whisper-1");
       
+      // Add streaming parameter if we have a progress callback
+      if (onTranscriptionProgress) {
+        formData.append("stream", "true");
+      }
+      
       console.log("Sending request to transcription API...");
       // Make a request to our API route that will handle the OpenAI API call
       const response = await fetch("/api/transcribe", {
@@ -76,6 +87,20 @@ export default function Transcriber({ audioBlob, onTranscriptionComplete, onTran
       }
       
       console.log("Transcription successful, text length:", data.text.length);
+      
+      // Simulate streaming for demo purposes if we have a progress callback
+      if (onTranscriptionProgress) {
+        const words = data.text.split(' ');
+        let currentText = '';
+        
+        for (let i = 0; i < words.length; i++) {
+          currentText += (i > 0 ? ' ' : '') + words[i];
+          onTranscriptionProgress(currentText);
+          // Add a small delay between words to simulate streaming
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
       onTranscriptionComplete(data.text);
     } catch (err) {
       console.error("Transcription error:", err);
@@ -97,7 +122,7 @@ export default function Transcriber({ audioBlob, onTranscriptionComplete, onTran
     } finally {
       setIsTranscribing(false);
     }
-  }, [isMounted, onTranscriptionComplete, onTranscriptionStart]);
+  }, [isMounted, onTranscriptionComplete, onTranscriptionStart, onTranscriptionProgress]);
 
   // Automatically start transcription when a new audioBlob is received
   useEffect(() => {

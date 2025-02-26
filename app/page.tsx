@@ -9,11 +9,12 @@ import ClientOnly from "@/components/ClientOnly";
 const Recorder = dynamic(() => import('@/components/Recorder'), { ssr: false });
 const Transcriber = dynamic(() => import('@/components/Transcriber'), { ssr: false });
 const Visualizer = dynamic(() => import('@/components/Visualizer'), { ssr: false });
+const StreamingTranscription = dynamic(() => import('@/components/StreamingTranscription'), { ssr: false });
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [transcribedText, setTranscribedText] = useState<string>("");
+  const [progressText, setProgressText] = useState<string>("");
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
@@ -104,12 +105,19 @@ export default function Home() {
   const handleTranscriptionStart = useCallback(() => {
     console.log("Transcription started");
     setIsTranscribing(true);
+    setProgressText("");
+  }, []);
+
+  // Handle transcription progress
+  const handleTranscriptionProgress = useCallback((text: string) => {
+    console.log("Transcription progress:", text.substring(0, 20) + "...");
+    setProgressText(text);
   }, []);
 
   // Handle transcription completion
   const handleTranscriptionComplete = useCallback((text: string) => {
     console.log("Transcription complete:", text);
-    setTranscribedText(text);
+    setProgressText(text);
     setIsTranscribing(false);
     
     // Copy to clipboard (only in browser)
@@ -183,17 +191,19 @@ export default function Home() {
           {isRecording && (
             <p className="mt-4 text-violet-400 animate-pulse">Recording in progress...</p>
           )}
-          {isTranscribing && (
+          {isTranscribing && !isRecording && (
             <p className="mt-4 text-blue-400">Transcribing...</p>
           )}
         </div>
         
-        {transcribedText && (
-          <div className="w-full p-4 bg-neutral-800 rounded-lg">
-            <h2 className="text-xl font-semibold mb-2 text-white">Last Transcription:</h2>
-            <p className="text-neutral-200">{transcribedText}</p>
-          </div>
-        )}
+        {/* Streaming Transcription Component */}
+        <ClientOnly>
+          <StreamingTranscription 
+            text={progressText} 
+            isTranscribing={isTranscribing} 
+            typingSpeed={10}
+          />
+        </ClientOnly>
         
         {/* Notification */}
         {showNotification && (
@@ -218,6 +228,7 @@ export default function Home() {
             audioBlob={audioBlob}
             onTranscriptionComplete={handleTranscriptionComplete}
             onTranscriptionStart={handleTranscriptionStart}
+            onTranscriptionProgress={handleTranscriptionProgress}
           />
         )}
         

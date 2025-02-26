@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const audioFile = formData.get('file') as File;
     const model = formData.get('model') as string || 'whisper-1';
+    const stream = formData.get('stream') === 'true';
 
     if (!audioFile) {
       return NextResponse.json(
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Received audio file:', audioFile.name, 'Size:', audioFile.size, 'Type:', audioFile.type);
+    console.log('Stream mode:', stream);
 
     // Validate the file
     if (audioFile.size === 0) {
