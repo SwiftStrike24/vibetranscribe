@@ -2,7 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thumb-violet-500\/30::-webkit-scrollbar-thumb {
+    background-color: rgba(139, 92, 246, 0.3);
+    border-radius: 9999px;
+  }
+  
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+}
 
 @layer base {
   :root {
@@ -109,8 +127,6 @@
   }
 }
 
-
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -118,4 +134,45 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Electron mode specific styles */
+.electron-mode {
+  background-color: transparent !important;
+}
+
+html, body {
+  background-color: transparent;
+}
+
+body.electron {
+  background-color: transparent;
+}
+
+/* Hide any potential dev tool indicators */
+#__next-build-watcher,
+.cursor-indicator,
+.cursor-icon,
+.dev-indicator,
+[class*="DevTools"],
+[id*="DevTools"],
+[class*="cursor-"],
+[id*="cursor-"] {
+  display: none !important;
+}
+
+/* Hide Next.js static route indicator with lightning bolt */
+.nextjs-toast,
+.nextjs-static-indicator-toast-wrapper,
+[data-nextjs-toast-wrapper],
+[class*="nextjs-"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+  overflow: hidden !important;
 }

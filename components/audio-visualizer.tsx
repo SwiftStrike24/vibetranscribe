@@ -196,9 +196,21 @@ export default function AudioVisualizer({ isRecording }: AudioVisualizerProps) {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center p-4 pointer-events-none">
-      <div className={`w-full max-w-md h-24 bg-neutral-800/80 backdrop-blur-md rounded-t-xl overflow-hidden transition-all duration-300 ease-in-out ${isRecording ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full'}`}>
-        <canvas ref={canvasRef} className="w-full h-full" />
-      </div>
+      {isRecording && (
+        <div className={`
+          w-full max-w-md h-24 
+          bg-neutral-800/80 backdrop-blur-md 
+          rounded-t-xl overflow-hidden 
+          shadow-lg border border-violet-500/20
+          transition-all duration-500 ease-in-out
+          opacity-100 translate-y-0
+        `}>
+          <canvas ref={canvasRef} className="w-full h-full" />
+          
+          {/* Add subtle gradient overlay */}
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-neutral-900/20 to-transparent pointer-events-none"></div>
+        </div>
+      )}
     </div>
   )
 }

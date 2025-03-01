@@ -16,11 +16,16 @@ export default function Visualizer({ isRecording }: VisualizerProps) {
   // Set isMounted to true once component mounts
   useEffect(() => {
     setIsMounted(true);
+    
+    // Log that visualizer is ready
+    console.log("Visualizer component mounted and ready");
   }, []);
 
+  // Don't render anything on the server side
   if (!isMounted) {
     return null;
   }
 
+  // Always render the AudioVisualizer - it will handle its own visibility logic
   return <AudioVisualizer isRecording={isRecording} />;
 } 

@@ -2,11 +2,18 @@
   "name": "vibetranscribe",
   "version": "0.1.0",
   "private": true,
+  "main": "electron-dist/main.js",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron:dev": "cross-env ELECTRON_START_URL=http://localhost:3000 concurrently \"npm run dev\" \"npm run electron:compile:watch\" \"npm run electron\"",
+    "electron": "wait-on http://localhost:3000 && electron .",
+    "electron:compile": "tsc -p electron/tsconfig.json",
+    "electron:compile:watch": "tsc -p electron/tsconfig.json --watch",
+    "electron:build": "next build && npm run electron:compile && electron-builder",
+    "electron:package": "npm run electron:compile && electron-builder"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
@@ -27,10 +34,46 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.9.1",
     "eslint": "^9",
     "eslint-config-next": "15.1.7",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.vibetranscribe.app",
+    "productName": "VibeTranscribe",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron-dist/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

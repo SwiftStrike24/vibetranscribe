@@ -1,0 +1,122 @@
+/* Custom CSS for electron mode to hide development indicators */
+
+/* Hide Next.js indicators and development overlays */
+.nextjs-toast,
+.nextjs-static-indicator-toast-wrapper,
+[data-nextjs-toast-wrapper],
+[class*="nextjs-"],
+div[role="status"][class*="nextjs-"],
+div[class*="nextjs-toast"],
+div[class*="indicator"],
+div[class*="toast"],
+div[class*="overlay"],
+div[class*="dev-indicator"],
+div[class*="build-error"],
+div[class*="hot-update"],
+[id*="__next-build-watcher"],
+[id*="__webpack-hot-middleware-client"],
+[id*="react-refresh"],
+[data-nextjs-dialog-overlay],
+[data-nextjs-dialog],
+[data-nextjs-toast] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  z-index: -9999 !important;
+  overflow: hidden !important;
+}
+
+/* Ensure transparent background */
+html, body, #__next {
+  background-color: transparent !important;
+  overflow: hidden !important;
+}
+
+/* Hide any loading text or initial title screen */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  z-index: 999999;
+  pointer-events: none;
+}
+
+/* Hide the title bar and any app name that might show up */
+head, title, h1:not(.electron-mode h1) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Electron mode specific styles - immediately visible to prevent flicker */
+.electron-mode {
+  background-color: transparent !important;
+  overflow: hidden !important;
+  opacity: 1;
+}
+
+/* Enhance transcription container appearance */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.electron-mode .transcription-container {
+  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Hide any loading indicators or flashes */
+#__next {
+  background-color: transparent !important;
+}
+
+/* Hide any development-related elements */
+[id*="__next-build-watcher"],
+[id*="__webpack-hot-middleware-client"],
+[id*="react-refresh"] {
+  display: none !important;
+}
+
+/* Hide any React and Next.js development overlays */
+#__next-build-watcher,
+#__next-prerender-indicator,
+.__react-error-overlay,
+#__nextjs-toast-wrapper {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+/* Ensure electron window isn't hidden by development overlays */
+.electron-window-wrapper {
+  z-index: 999999 !important;
+  position: relative !important;
+}
+
+/* Hide any additional Next.js 15.x specific elements */
+div[data-nextjs-terminal],
+div[data-nextjs-compiler] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+} 

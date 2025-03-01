@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./electron.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,6 +25,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Add meta tag to ensure proper rendering in Electron */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta httpEquiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval';" />
+        <style dangerouslySetInnerHTML={{ __html: `
+          /* Hide Next.js development indicators */
+          .nextjs-toast, .nextjs-static-indicator-toast-wrapper, [data-nextjs-toast-wrapper],
+          [class*="nextjs-"], div[role="status"][class*="nextjs-"], div[class*="nextjs-toast"],
+          div[class*="indicator"], div[class*="toast"], div[class*="overlay"],
+          div[class*="dev-indicator"], div[class*="build-error"], div[class*="hot-update"] {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+          
+          /* Ensure transparent background */
+          html, body {
+            background-color: transparent !important;
+          }
+        `}} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
