@@ -15,7 +15,7 @@ const nextConfig = {
     buildActivity: false,
     buildActivityPosition: 'bottom-right',
   },
-  // Disable telemetry
+  // Force dynamic rendering
   experimental: {
     disableOptimizedLoading: true,
     optimizeCss: true,

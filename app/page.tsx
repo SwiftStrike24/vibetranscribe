@@ -6,12 +6,14 @@ import { setupKeyboardShortcuts } from "@/utils/keyboardShortcuts";
 import ClientOnly from "@/components/ClientOnly";
 import "./electron.css"; // Import the electron-specific CSS
 
+// Force dynamic rendering
+export const dynamicConfig = 'force-dynamic';
+
 // Dynamically import components with no SSR
 const Recorder = dynamic(() => import('@/components/Recorder'), { ssr: false });
 const Transcriber = dynamic(() => import('@/components/Transcriber'), { ssr: false });
 const Visualizer = dynamic(() => import('@/components/Visualizer'), { ssr: false });
 const StreamingTranscription = dynamic(() => import('@/components/StreamingTranscription'), { ssr: false });
-const DisableDevOverlay = dynamic(() => import('@/components/DisableDevOverlay'), { ssr: false });
 
 // Check if we're in Electron
 const isElectron = () => {
@@ -365,9 +367,6 @@ export default function Home() {
   if (isElectronMode) {
     return (
       <div className="electron-mode h-full">
-        {/* Component to hide development indicators */}
-        <DisableDevOverlay />
-        
         {/* Streaming Transcription Component - conditionally rendered */}
         {shouldRenderTranscription && (
           <div 
