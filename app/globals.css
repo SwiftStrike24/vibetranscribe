@@ -2,6 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom animations */
+@keyframes statusGlow {
+  0%, 100% {
+    text-shadow: 0 0 2px rgba(167, 139, 250, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+  }
+}
+
+@keyframes rotate-subtle {
+  0% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+  100% {
+    transform: rotate(-2deg);
+  }
+}
+
+.status-ready {
+  animation: statusGlow 3s infinite;
+}
+
+.mic-subtle-animation {
+  animation: rotate-subtle 4s infinite ease-in-out;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
 /* Custom scrollbar */
 @layer utilities {
   .scrollbar-thin {

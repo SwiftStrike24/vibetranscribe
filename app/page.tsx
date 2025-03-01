@@ -25,15 +25,10 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [progressText, setProgressText] = useState<string>("");
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [isElectronMode, setIsElectronMode] = useState(false);
   const [isTranscriptionClosed, setIsTranscriptionClosed] = useState(false);
   
-  // Use a ref for notification timer to avoid memory leaks
-  const notificationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   // Debounce timer ref for window resizing
   const resizeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastResizeStateRef = useRef<boolean | null>(null);
@@ -44,25 +39,6 @@ export default function Home() {
 
   // Startup protection flag
   const startupCompleteRef = useRef<boolean>(false);
-
-  // Show a temporary notification
-  const showTemporaryNotification = useCallback((message: string) => {
-    console.log("Showing notification:", message);
-    
-    // Clear any existing timer
-    if (notificationTimerRef.current) {
-      clearTimeout(notificationTimerRef.current);
-      notificationTimerRef.current = null;
-    }
-    
-    setNotificationMessage(message);
-    setShowNotification(true);
-    
-    notificationTimerRef.current = setTimeout(() => {
-      setShowNotification(false);
-      notificationTimerRef.current = null;
-    }, 3000);
-  }, []);
 
   // Set isMounted to true once component mounts and check if we're in Electron
   useEffect(() => {
@@ -81,11 +57,7 @@ export default function Home() {
       startupCompleteRef.current = true;
     }, 2000);
     
-    // Clean up notification timer on unmount
     return () => {
-      if (notificationTimerRef.current) {
-        clearTimeout(notificationTimerRef.current);
-      }
       clearTimeout(startupTimer);
       // Remove electron class when component unmounts
       document.body.classList.remove('electron');
@@ -104,23 +76,20 @@ export default function Home() {
       
       // Reset the closed state when starting a new recording
       setIsTranscriptionClosed(false);
-      
-      showTemporaryNotification("Recording started. Press Esc to stop.");
     } else {
       console.log("Cannot start recording: already recording or transcribing");
     }
-  }, [isRecording, isTranscribing, showTemporaryNotification]);
+  }, [isRecording, isTranscribing]);
 
   const stopRecordingHandler = useCallback(() => {
     console.log("Stop recording handler called");
     if (isRecording) {
       console.log("Stopping recording...");
       setIsRecording(false);
-      showTemporaryNotification("Recording stopped. Transcribing...");
     } else {
       console.log("Cannot stop recording: not currently recording");
     }
-  }, [isRecording, showTemporaryNotification]);
+  }, [isRecording]);
 
   // Handler for manually closing the transcription box
   const handleCloseTranscription = useCallback(() => {
@@ -326,21 +295,18 @@ export default function Home() {
     // In Electron mode, send to main process
     if (isElectronMode) {
       window.electronAPI.sendTranscriptionComplete(text);
-      showTemporaryNotification("Transcription copied to clipboard!");
     } 
     // In browser mode, use the browser's clipboard API
     else if (isMounted && navigator.clipboard) {
       navigator.clipboard.writeText(text)
         .then(() => {
           console.log("Text copied to clipboard");
-          showTemporaryNotification("Transcription copied to clipboard!");
         })
         .catch((err) => {
           console.error("Could not copy text: ", err);
-          showTemporaryNotification("Failed to copy to clipboard.");
         });
     }
-  }, [isMounted, isElectronMode, showTemporaryNotification]);
+  }, [isMounted, isElectronMode]);
 
   // Add a manual trigger for testing (mostly for browser mode)
   const handleManualStartRecording = () => {
@@ -401,11 +367,11 @@ export default function Home() {
                 {/* Stop recording button */}
                 <button 
                   onClick={stopRecordingHandler}
-                  className="ml-2 p-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-full transition-all group"
+                  className="ml-2 p-1.5 bg-red-500/20 hover:bg-red-500/30 hover:scale-105 rounded-full transition-all duration-300 group"
                   title="Stop recording"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-400 group-hover:text-red-300" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-400 group-hover:text-red-300 transform transition-transform group-hover:rotate-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
                   </svg>
                 </button>
               </>
@@ -420,20 +386,23 @@ export default function Home() {
             ) : (
               <>
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-50"></span>
+                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75 delay-150"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500 shadow-sm shadow-violet-500/50"></span>
                 </span>
-                <p className="text-violet-400 text-sm font-medium whitespace-nowrap">VibeTranscribe Ready • Press Ctrl+Alt+R</p>
+                <p className="text-violet-400 text-sm font-medium whitespace-nowrap status-ready">VibeTranscribe Ready • Press Ctrl+Alt+R</p>
                 {/* Start recording button */}
                 <button 
                   onClick={startRecordingHandler}
                   disabled={isTranscribing}
-                  className={`ml-2 p-1.5 ${isTranscribing ? 'bg-violet-500/10 cursor-not-allowed' : 'bg-violet-500/20 hover:bg-violet-500/30'} rounded-full transition-all group`}
+                  className={`ml-2 p-1.5 ${isTranscribing ? 'bg-violet-500/10 cursor-not-allowed' : 'bg-violet-500/20 hover:bg-violet-500/30 hover:scale-105'} rounded-full transition-all duration-300 group`}
                   title="Start recording"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isTranscribing ? 'text-violet-400/50' : 'text-violet-400 group-hover:text-violet-300'}`} viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" />
-                    <path d="M17 12v-2c0-.55-.45-1-1-1s-1 .45-1 1v2c0 2.21-1.79 4-4 4s-4-1.79-4-4v-2c0-.55-.45-1-1-1s-1 .45-1 1v2c0 3.31 2.69 6 6 6 .71 0 1.37-.15 2-.38v1.38H10c-.55 0-1 .45-1 1s.45 1 1 1h4c.55 0 1-.45 1-1s-.45-1-1-1h-1v-1.38c.63.23 1.29.38 2 .38 3.31 0 6-2.69 6-6z" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isTranscribing ? 'text-violet-400/50' : 'text-violet-400 group-hover:text-violet-300'} transform transition-transform group-hover:rotate-3 mic-subtle-animation`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                    <line x1="8" y1="22" x2="16" y2="22" />
                   </svg>
                 </button>
               </>
@@ -460,13 +429,6 @@ export default function Home() {
           
           <Visualizer isRecording={isRecording} />
         </ClientOnly>
-        
-        {/* Notification */}
-        {showNotification && (
-          <div className="fixed top-2 right-2 bg-violet-600 text-white px-3 py-1.5 rounded-md shadow-lg text-xs transform transition-all duration-300 ease-in-out animate-fadeIn">
-            {notificationMessage}
-          </div>
-        )}
       </div>
     );
   }
@@ -534,13 +496,6 @@ export default function Home() {
             onClose={handleCloseTranscription}
           />
         </ClientOnly>
-        
-        {/* Notification */}
-        {showNotification && (
-          <div className="fixed top-4 right-4 bg-violet-600 text-white px-4 py-2 rounded-md shadow-lg">
-            {notificationMessage}
-          </div>
-        )}
       </div>
       
       {/* Client-only components */}
