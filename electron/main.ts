@@ -6,6 +6,9 @@ import * as url from 'url';
 const isDev = process.env.NODE_ENV !== 'production';
 const PORT = 3000;
 
+// Define a flag for DevTools
+const openDevTools = isDev;
+
 // Custom BrowserWindow with additional properties
 interface CustomBrowserWindow extends BrowserWindow {
   creationTime?: number;
@@ -113,7 +116,7 @@ function createWindow() {
         nodeIntegration: false,
         contextIsolation: true,
         preload: path.join(__dirname, 'preload.js'),
-        devTools: isDev
+        devTools: openDevTools
       }
     });
 
@@ -160,6 +163,12 @@ function createWindow() {
           ...bounds,
           height: COLLAPSED_HEIGHT
         });
+        
+        // Open DevTools in development mode
+        if (isDev) {
+          console.log("Opening DevTools (development mode)");
+          mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
         
         // Short delay to ensure React has rendered before showing
         setTimeout(() => {
@@ -209,6 +218,28 @@ function registerShortcuts() {
       console.error('Error in stop recording shortcut:', error);
     }
   });
+
+  // Ctrl+Shift+I to toggle DevTools in dev mode
+  if (isDev) {
+    globalShortcut.register('CommandOrControl+Shift+I', toggleDevTools);
+  }
+}
+
+// Utility function to toggle DevTools
+function toggleDevTools() {
+  if (!mainWindow) return;
+  
+  try {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+      console.log("DevTools closed");
+    } else {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+      console.log("DevTools opened");
+    }
+  } catch (error) {
+    console.error('Error toggling DevTools:', error);
+  }
 }
 
 // Handle IPC events from renderer
