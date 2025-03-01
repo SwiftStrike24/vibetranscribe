@@ -16,14 +16,19 @@ interface CustomBrowserWindow extends BrowserWindow {
 }
 
 let mainWindow: CustomBrowserWindow | null = null;
-// Default window sizes
-const COLLAPSED_HEIGHT = 80; // Height when just showing status
-const EXPANDED_HEIGHT = 320; // Height when showing transcription
+// Default window size
+// We use a single constant height to prevent flickering during transitions
+const WINDOW_HEIGHT = 540; // Height for the window (previously had collapsible behavior)
 
 // Keep track of last resize request time and state
 let lastResizeTime = 0;
 let lastResizeState = false;
 let isResizing = false;
+
+// Shortcut management
+const TARGET_SHORTCUT = 'CommandOrControl+Shift+R';
+const originalShortcutOwners: Map<string, boolean> = new Map();
+let shortcutsRestored = true;
 
 // Function to resize the window
 function resizeWindow(expanded: boolean) {
@@ -32,14 +37,14 @@ function resizeWindow(expanded: boolean) {
   // Only allow resize after window has been visible for some time
   const windowCreationTime = mainWindow.creationTime || Date.now();
   if (Date.now() - windowCreationTime < 2000) {
-    console.log(`Ignoring resize during startup phase: ${expanded}`);
+    console.log(`Ignoring content visibility change during startup phase: ${expanded}`);
     return;
   }
   
   // Prevent rapid resize calls
   const now = Date.now();
   if (isResizing || (expanded === lastResizeState && now - lastResizeTime < 500)) {
-    console.log(`Ignoring redundant resize request: ${expanded}`);
+    console.log(`Ignoring redundant content visibility request: ${expanded}`);
     return;
   }
   
@@ -51,19 +56,32 @@ function resizeWindow(expanded: boolean) {
     // Get current position
     const bounds = mainWindow.getBounds();
     
-    // Calculate new height based on state
-    const newHeight = expanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
+    // Keep the height constant to prevent flickering
+    const newHeight = WINDOW_HEIGHT; // Always use the same height
     
-    console.log(`Performing resize: ${expanded ? 'expanded' : 'collapsed'}, from height ${bounds.height} to ${newHeight}`);
+    console.log(`Handling window state change: ${expanded ? 'expanded' : 'collapsed'} (height stays at ${newHeight}px)`);
     
-    // Keep same x position but adjust height and y position
-    // This ensures the status bar stays in the same place at the bottom
-    mainWindow.setBounds({
-      x: bounds.x,
-      y: expanded ? bounds.y - (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) : bounds.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT),
-      width: bounds.width,
-      height: newHeight
-    }, true); // Animate the resize
+    // Keep same x position and height but adjust content visibility via IPC
+    // This ensures no resizing flicker
+    const display = screen.getDisplayMatching(bounds);
+    const workAreaHeight = display.workArea.height;
+    
+    // Only update position if it's needed (window moved or first positioning)
+    if (Math.abs(bounds.height - newHeight) > 5 || 
+        Math.abs(bounds.y - (workAreaHeight - newHeight - 10)) > 5) {
+      
+      const newBounds = {
+        x: bounds.x,
+        width: bounds.width,
+        height: newHeight,
+        y: workAreaHeight - newHeight - 10  // Always position at bottom of screen
+      };
+      
+      console.log(`Updating bounds: x=${newBounds.x}, y=${newBounds.y}, width=${newBounds.width}, height=${newHeight}`);
+      mainWindow.setBounds(newBounds, true); // Animate the resize
+    } else {
+      console.log(`Skipping resize - window already at correct size and position`);
+    }
     
     // Reset resizing flag after a short delay
     setTimeout(() => {
@@ -96,9 +114,9 @@ function createWindow() {
     // Create the browser window with specific settings for an overlay
     mainWindow = new BrowserWindow({
       width: 380,
-      height: COLLAPSED_HEIGHT,
+      height: WINDOW_HEIGHT, // Using expanded height from the start
       x: Math.floor((width - 380) / 2),
-      y: Math.floor(height - 90),
+      y: Math.floor(height - WINDOW_HEIGHT - 10),
       frame: false,
       transparent: true,
       backgroundColor: '#00000000',
@@ -157,11 +175,11 @@ function createWindow() {
         // Set the content loaded flag
         mainWindow.isContentLoaded = true;
         
-        // Force to collapsed size on first show
+        // Force to expanded size on first show
         const bounds = mainWindow.getBounds();
         mainWindow.setBounds({
           ...bounds,
-          height: COLLAPSED_HEIGHT
+          height: WINDOW_HEIGHT
         });
         
         // Open DevTools in development mode
@@ -199,29 +217,125 @@ function createWindow() {
   }
 }
 
-// Register global keyboard shortcuts
+// Check if a shortcut is already registered by another application
+function isShortcutRegisteredExternally(shortcut: string): boolean {
+  try {
+    // Try to register the shortcut temporarily
+    const isRegistered = globalShortcut.register(shortcut, () => {
+      console.log('Checking if shortcut is registered externally');
+    });
+    
+    // If we were able to register it, unregister it and return false (not taken)
+    if (isRegistered) {
+      globalShortcut.unregister(shortcut);
+      return false;
+    }
+    
+    // If we couldn't register it, it's already taken
+    return true;
+  } catch (error) {
+    console.error('Error checking shortcut availability:', error);
+    return false; // Assume it's not taken in case of error
+  }
+}
+
+// Store information about externally registered shortcuts
+function saveExternalShortcutState() {
+  try {
+    // Check our target shortcut
+    const isExternallyRegistered = isShortcutRegisteredExternally(TARGET_SHORTCUT);
+    console.log(`Checking ${TARGET_SHORTCUT} - Registered externally: ${isExternallyRegistered}`);
+    
+    // Store the state
+    originalShortcutOwners.set(TARGET_SHORTCUT, isExternallyRegistered);
+    shortcutsRestored = false;
+    
+    return isExternallyRegistered;
+  } catch (error) {
+    console.error('Error saving external shortcut state:', error);
+    return false;
+  }
+}
+
+// Register global keyboard shortcuts with high priority
 function registerShortcuts() {
-  // Ctrl+Alt+R to start recording
-  globalShortcut.register('CommandOrControl+Alt+R', () => {
-    try {
-      mainWindow?.webContents.send('start-recording');
-    } catch (error) {
-      console.error('Error in start recording shortcut:', error);
-    }
-  });
+  try {
+    // First, save the state of any external shortcuts
+    const wasExternallyRegistered = saveExternalShortcutState();
+    
+    // Unregister any existing registrations of our target shortcut
+    // This will force our registration to take precedence
+    globalShortcut.unregister(TARGET_SHORTCUT);
+    
+    // Give the system a moment to release the shortcut
+    setTimeout(() => {
+      // Register our Ctrl+Shift+R with high priority
+      const success = globalShortcut.register(TARGET_SHORTCUT, () => {
+        try {
+          console.log('Ctrl+Shift+R shortcut triggered');
+          mainWindow?.webContents.send('start-recording');
+          
+          // Also bring the window to front and focus it
+          if (mainWindow && !mainWindow.isVisible()) {
+            mainWindow.show();
+          }
+          if (mainWindow) {
+            mainWindow.setAlwaysOnTop(true, 'screen-saver', 2);
+            setTimeout(() => {
+              mainWindow?.focus();
+            }, 50);
+          }
+        } catch (error) {
+          console.error('Error in start recording shortcut:', error);
+        }
+      });
+      
+      console.log(`Registered ${TARGET_SHORTCUT} shortcut: ${success}`);
+      
+      if (!success && wasExternallyRegistered) {
+        // If registration failed and we know it was externally registered,
+        // show a notification or log the issue
+        console.error(`Failed to register ${TARGET_SHORTCUT} - it might be used by another application`);
+        // You could notify the user here if desired
+      }
+    }, 100);
 
-  // Esc to stop recording
-  globalShortcut.register('Escape', () => {
-    try {
-      mainWindow?.webContents.send('stop-recording');
-    } catch (error) {
-      console.error('Error in stop recording shortcut:', error);
-    }
-  });
+    // Esc to stop recording
+    globalShortcut.register('Escape', () => {
+      try {
+        mainWindow?.webContents.send('stop-recording');
+      } catch (error) {
+        console.error('Error in stop recording shortcut:', error);
+      }
+    });
 
-  // Ctrl+Shift+I to toggle DevTools in dev mode
-  if (isDev) {
-    globalShortcut.register('CommandOrControl+Shift+I', toggleDevTools);
+    // Ctrl+Shift+I to toggle DevTools in dev mode
+    if (isDev) {
+      globalShortcut.register('CommandOrControl+Shift+I', toggleDevTools);
+    }
+  } catch (error) {
+    console.error('Error registering shortcuts:', error);
+  }
+}
+
+// Restore original shortcut state when app quits
+function restoreShortcuts() {
+  if (shortcutsRestored) return;
+  
+  try {
+    console.log('Restoring original shortcut registrations');
+    
+    // Unregister our shortcuts
+    globalShortcut.unregister(TARGET_SHORTCUT);
+    globalShortcut.unregister('Escape');
+    if (isDev) {
+      globalShortcut.unregister('CommandOrControl+Shift+I');
+    }
+    
+    shortcutsRestored = true;
+    console.log('Shortcuts restored successfully');
+  } catch (error) {
+    console.error('Error restoring shortcuts:', error);
   }
 }
 
@@ -252,16 +366,16 @@ function setupIPC() {
   // Set up IPC for window sizing - only allow if content is fully loaded
   ipcMain.on('set-window-size', (_event, expanded: boolean) => {
     if (!mainWindow || !mainWindow.isContentLoaded) {
-      console.log("Ignoring resize request - window not ready");
+      console.log("Ignoring content state change request - window not ready");
       return;
     }
     
     if (typeof expanded !== 'boolean') {
-      console.error(`Invalid resize request: expected boolean, got ${typeof expanded}`);
+      console.error(`Invalid content state request: expected boolean, got ${typeof expanded}`);
       return;
     }
     
-    console.log(`Resize window request received: expanded = ${expanded}`);
+    console.log(`Content visibility change request received: expanded = ${expanded}`);
     resizeWindow(expanded);
   });
   
@@ -271,6 +385,35 @@ function setupIPC() {
       console.log("Show window request received");
       mainWindow.show();
     }
+  });
+  
+  // Add handler for hide window IPC call
+  ipcMain.on('hide-window', () => {
+    if (mainWindow && mainWindow.isVisible()) {
+      console.log("Hide window request received");
+      mainWindow.hide();
+    }
+  });
+  
+  // Add handler to check shortcut registration status
+  ipcMain.on('check-shortcut-registration', (event) => {
+    const isRegistered = globalShortcut.isRegistered(TARGET_SHORTCUT);
+    console.log(`Checking if shortcut is registered: ${isRegistered}`);
+    event.reply('shortcut-registration-result', isRegistered);
+  });
+  
+  // Add handler to refresh shortcuts
+  ipcMain.on('refresh-shortcuts', (event) => {
+    console.log("Refreshing shortcuts per renderer request");
+    
+    // Unregister all shortcuts first
+    globalShortcut.unregisterAll();
+    
+    // Then re-register them
+    registerShortcuts();
+    
+    // Notify renderer that shortcuts have been refreshed
+    event.reply('shortcuts-refreshed');
   });
 }
 
@@ -285,6 +428,31 @@ app.whenReady().then(() => {
   }
 }).catch(error => {
   console.error('Fatal error in app.whenReady:', error);
+});
+
+// Handle app activation (macOS)
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+// Clean up when app is quitting
+app.on('will-quit', () => {
+  // Restore original shortcut state
+  restoreShortcuts();
+  
+  // Unregister all shortcuts
+  globalShortcut.unregisterAll();
+});
+
+// Also handle the window-all-closed event
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    // Restore shortcuts before quitting
+    restoreShortcuts();
+    app.quit();
+  }
 });
 
 // Export for CommonJS compatibility

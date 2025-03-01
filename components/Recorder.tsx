@@ -6,9 +6,10 @@ interface RecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
+  selectedMicDevice?: string;
 }
 
-export default function Recorder({ onRecordingComplete, isRecording, setIsRecording }: RecorderProps) {
+export default function Recorder({ onRecordingComplete, isRecording, setIsRecording, selectedMicDevice }: RecorderProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -52,12 +53,22 @@ export default function Recorder({ onRecordingComplete, isRecording, setIsRecord
       }
       
       console.log("Requesting microphone access...");
+      
+      // Configure audio constraints with device ID if provided
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      };
+      
+      // Add deviceId constraint if a specific microphone is selected
+      if (selectedMicDevice) {
+        console.log("Using selected microphone device:", selectedMicDevice);
+        audioConstraints.deviceId = { exact: selectedMicDevice };
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
+        audio: audioConstraints
       });
       console.log("Microphone access granted");
       
@@ -112,7 +123,7 @@ export default function Recorder({ onRecordingComplete, isRecording, setIsRecord
       console.error("Error accessing microphone:", error);
       setIsRecording(false);
     }
-  }, [onRecordingComplete, setIsRecording, isMounted]);
+  }, [onRecordingComplete, setIsRecording, isMounted, selectedMicDevice]);
 
   // Define stopRecording as a useCallback
   const stopRecording = useCallback(() => {

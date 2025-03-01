@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { setupKeyboardShortcuts } from "@/utils/keyboardShortcuts";
 import ClientOnly from "@/components/ClientOnly";
 import "./electron.css"; // Import the electron-specific CSS
+import { AudioDevice, getAudioInputDevices } from "@/utils/audioDevices";
 
 // Force dynamic rendering
 export const dynamicConfig = 'force-dynamic';
@@ -28,6 +29,11 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [isElectronMode, setIsElectronMode] = useState(false);
   const [isTranscriptionClosed, setIsTranscriptionClosed] = useState(false);
+  
+  // State for mic selection dropdown
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [selectedMicDevice, setSelectedMicDevice] = useState<string>('');
+  const [showMicDropdown, setShowMicDropdown] = useState(false);
   
   // Debounce timer ref for window resizing
   const resizeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -63,6 +69,46 @@ export default function Home() {
       document.body.classList.remove('electron');
     };
   }, []);
+
+  // Effect to load available audio devices
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const loadAudioDevices = async () => {
+      try {
+        const devices = await getAudioInputDevices();
+        console.log("Available audio devices:", devices);
+        setAudioDevices(devices);
+        
+        // Set default device if we have devices and no selection yet
+        if (devices.length > 0 && !selectedMicDevice) {
+          setSelectedMicDevice(devices[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Error loading audio devices:", error);
+      }
+    };
+
+    loadAudioDevices();
+  }, [isMounted, selectedMicDevice]);
+
+  // Close mic dropdown when clicking outside
+  useEffect(() => {
+    if (!showMicDropdown) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Check if the click is outside the dropdown area
+      if (!target.closest('.mic-dropdown-container')) {
+        setShowMicDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMicDropdown]);
 
   // Define handlers as useCallbacks to avoid recreating them on every render
   const startRecordingHandler = useCallback(() => {
@@ -104,6 +150,19 @@ export default function Home() {
       window.electronAPI.setWindowSize(false);
     }
   }, [isElectronMode]);
+
+  // Toggle mic dropdown visibility
+  const toggleMicDropdown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMicDropdown(prev => !prev);
+  }, []);
+
+  // Select a microphone device
+  const selectMicDevice = useCallback((deviceId: string) => {
+    console.log("Selecting microphone device:", deviceId);
+    setSelectedMicDevice(deviceId);
+    setShowMicDropdown(false);
+  }, []);
 
   // Effect to track when there's been no transcription activity for a while
   const [shouldRenderTranscription, setShouldRenderTranscription] = useState(false);
@@ -239,11 +298,33 @@ export default function Home() {
       stopRecordingHandler();
     });
     
+    // Verify shortcut registration after a delay
+    let shortcutCheckTimer: NodeJS.Timeout;
+    if (window.electronAPI.checkShortcutRegistration) {
+      shortcutCheckTimer = setTimeout(async () => {
+        try {
+          const isRegistered = await window.electronAPI.checkShortcutRegistration();
+          console.log(`Shortcut registration check: ${isRegistered ? 'Successful' : 'Failed'}`);
+          
+          // If registration failed, we could try once more
+          if (!isRegistered && window.electronAPI.refreshShortcuts) {
+            console.log("Attempting to refresh shortcut registration");
+            await window.electronAPI.refreshShortcuts();
+          }
+        } catch (err) {
+          console.error("Error checking shortcut registration:", err);
+        }
+      }, 2000);
+    }
+    
     // Clean up Electron IPC listeners
     return () => {
       console.log("Cleaning up Electron IPC listeners");
       removeStartListener();
       removeStopListener();
+      if (shortcutCheckTimer) {
+        clearTimeout(shortcutCheckTimer);
+      }
     };
   }, [isMounted, isElectronMode, startRecordingHandler, stopRecordingHandler]);
 
@@ -390,21 +471,82 @@ export default function Home() {
                   <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75 delay-150"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500 shadow-sm shadow-violet-500/50"></span>
                 </span>
-                <p className="text-violet-400 text-sm font-medium whitespace-nowrap status-ready">VibeTranscribe Ready • Press Ctrl+Alt+R</p>
-                {/* Start recording button */}
-                <button 
-                  onClick={startRecordingHandler}
-                  disabled={isTranscribing}
-                  className={`ml-2 p-1.5 ${isTranscribing ? 'bg-violet-500/10 cursor-not-allowed' : 'bg-violet-500/20 hover:bg-violet-500/30 hover:scale-105'} rounded-full transition-all duration-300 group`}
-                  title="Start recording"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isTranscribing ? 'text-violet-400/50' : 'text-violet-400 group-hover:text-violet-300'} transform transition-transform group-hover:rotate-3 mic-subtle-animation`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                    <line x1="8" y1="22" x2="16" y2="22" />
-                  </svg>
-                </button>
+                <p className="text-violet-400 text-sm font-medium whitespace-nowrap status-ready">VibeTranscribe Ready • Press Ctrl+Shift+R</p>
+                
+                {/* Microphone dropdown container */}
+                <div className="mic-dropdown-container relative ml-2">
+                  {/* Start recording button with dropdown toggle */}
+                  <div className="flex items-center">
+                    <button 
+                      onClick={startRecordingHandler}
+                      disabled={isTranscribing}
+                      className={`p-1.5 ${isTranscribing ? 'bg-violet-500/10 cursor-not-allowed' : 'bg-violet-500/20 hover:bg-violet-500/30 hover:scale-105'} rounded-full transition-all duration-300 group`}
+                      title="Start recording"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isTranscribing ? 'text-violet-400/50' : 'text-violet-400 group-hover:text-violet-300'} transform transition-transform group-hover:rotate-3 mic-subtle-animation`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="22" />
+                        <line x1="8" y1="22" x2="16" y2="22" />
+                      </svg>
+                    </button>
+                    
+                    {/* Dropdown toggle button */}
+                    <button
+                      onClick={toggleMicDropdown}
+                      className="p-1 ml-0.5 text-violet-400 hover:text-violet-300 transition-all duration-300"
+                      title="Select microphone"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Microphone dropdown */}
+                  {showMicDropdown && (
+                    <div className="absolute bottom-full mb-2 right-0 bg-neutral-800/95 backdrop-blur-md rounded-lg shadow-lg border border-violet-500/20 overflow-hidden transform origin-bottom-right w-48 z-50">
+                      <div className="p-2 text-xs text-violet-300 border-b border-violet-500/10">
+                        Select Microphone
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {audioDevices.length > 0 ? (
+                          <ul className="py-1">
+                            {audioDevices.map((device) => (
+                              <li key={device.deviceId}>
+                                <button
+                                  onClick={() => selectMicDevice(device.deviceId)}
+                                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-violet-500/10 transition-colors ${
+                                    selectedMicDevice === device.deviceId
+                                      ? 'text-violet-300 font-medium bg-violet-500/15'
+                                      : 'text-neutral-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                      <line x1="12" y1="19" x2="12" y2="22" />
+                                      <line x1="8" y1="22" x2="16" y2="22" />
+                                    </svg>
+                                    <span className="truncate">{device.label}</span>
+                                    {device.isDefault && (
+                                      <span className="ml-1 text-xs text-violet-400">(Default)</span>
+                                    )}
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="p-3 text-xs text-neutral-400 text-center">
+                            No microphones found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -416,6 +558,7 @@ export default function Home() {
             onRecordingComplete={handleRecordingComplete}
             isRecording={isRecording}
             setIsRecording={setIsRecording}
+            selectedMicDevice={selectedMicDevice}
           />
           
           {audioBlob && (
@@ -427,7 +570,7 @@ export default function Home() {
             />
           )}
           
-          <Visualizer isRecording={isRecording} />
+          <Visualizer isRecording={isRecording} selectedMicDevice={selectedMicDevice} />
         </ClientOnly>
       </div>
     );
@@ -445,12 +588,73 @@ export default function Home() {
         <div className="text-center mb-8">
           <p className="text-neutral-400 text-sm text-center mt-4">
             Press <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Ctrl</kbd> +{" "}
-            <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Alt</kbd> +{" "}
+            <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Shift</kbd> +{" "}
             <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">R</kbd> to start recording
           </p>
           <p className="text-neutral-400 text-sm text-center mt-2">
             Press <kbd className="px-2 py-1 bg-neutral-800 rounded text-xs">Esc</kbd> to stop recording
           </p>
+          
+          {/* Microphone selection */}
+          <div className="mt-4 flex justify-center items-center">
+            <div className="relative inline-block text-left mic-dropdown-container">
+              <button
+                onClick={toggleMicDropdown}
+                className="flex items-center px-3 py-2 text-sm text-violet-300 bg-neutral-800 hover:bg-neutral-700 rounded-md shadow-sm border border-violet-500/20 transition-colors duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                  <line x1="8" y1="22" x2="16" y2="22" />
+                </svg>
+                {audioDevices.find(d => d.deviceId === selectedMicDevice)?.label || 'Select Microphone'}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              
+              {showMicDropdown && (
+                <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-neutral-800 border border-violet-500/20 z-50">
+                  <div className="p-2 border-b border-violet-500/10 text-sm text-violet-300">
+                    Available Microphones
+                  </div>
+                  <div className="max-h-40 overflow-y-auto py-1">
+                    {audioDevices.length > 0 ? (
+                      <ul>
+                        {audioDevices.map((device) => (
+                          <li key={device.deviceId}>
+                            <button
+                              onClick={() => selectMicDevice(device.deviceId)}
+                              className={`block px-4 py-2 text-sm w-full text-left hover:bg-violet-500/10 ${
+                                selectedMicDevice === device.deviceId
+                                  ? 'text-violet-300 bg-violet-500/15'
+                                  : 'text-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                                </svg>
+                                <span className="truncate">{device.label}</span>
+                                {device.isDefault && (
+                                  <span className="ml-1 text-xs text-violet-400">(Default)</span>
+                                )}
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="px-4 py-2 text-sm text-neutral-400">
+                        No microphones found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           
           {/* Manual buttons for testing */}
           <div className="mt-4 flex justify-center space-x-4">
@@ -477,49 +681,45 @@ export default function Home() {
               Stop Recording
             </button>
           </div>
-          
-          {/* Recording status */}
-          {isRecording && (
-            <p className="mt-4 text-violet-400 animate-pulse">Recording in progress...</p>
-          )}
-          {isTranscribing && !isRecording && (
-            <p className="mt-4 text-blue-400">Transcribing...</p>
-          )}
         </div>
         
-        {/* Streaming Transcription Component */}
-        <ClientOnly>
-          <StreamingTranscription 
-            text={progressText} 
-            isTranscribing={isTranscribing} 
-            typingSpeed={10}
-            onClose={handleCloseTranscription}
-          />
-        </ClientOnly>
-      </div>
-      
-      {/* Client-only components */}
-      <ClientOnly>
-        {/* Recorder component (invisible) */}
-        <Recorder 
-          onRecordingComplete={handleRecordingComplete}
-          isRecording={isRecording}
-          setIsRecording={setIsRecording}
-        />
-        
-        {/* Transcriber component */}
-        {audioBlob && (
-          <Transcriber 
-            audioBlob={audioBlob}
-            onTranscriptionComplete={handleTranscriptionComplete}
-            onTranscriptionStart={handleTranscriptionStart}
-            onTranscriptionProgress={handleTranscriptionProgress}
-          />
+        {/* Transcription box */}
+        {shouldRenderTranscription && (
+          <div className={`transition-opacity duration-300 ${isTranscribing || progressText ? 'opacity-100' : 'opacity-0'}`}>
+            <ClientOnly>
+              <StreamingTranscription 
+                text={progressText} 
+                isTranscribing={isTranscribing}
+                typingSpeed={10}
+                onClose={handleCloseTranscription}
+              />
+            </ClientOnly>
+          </div>
         )}
         
-        {/* Visualizer component */}
-        <Visualizer isRecording={isRecording} />
-      </ClientOnly>
+        {/* Hidden components for functionality */}
+        <ClientOnly>
+          <Recorder 
+            onRecordingComplete={handleRecordingComplete}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            selectedMicDevice={selectedMicDevice}
+          />
+          
+          {audioBlob && (
+            <Transcriber 
+              audioBlob={audioBlob}
+              onTranscriptionComplete={handleTranscriptionComplete}
+              onTranscriptionStart={handleTranscriptionStart}
+              onTranscriptionProgress={handleTranscriptionProgress}
+            />
+          )}
+          
+          <div className="mt-6">
+            <Visualizer isRecording={isRecording} selectedMicDevice={selectedMicDevice} />
+          </div>
+        </ClientOnly>
+      </div>
     </div>
   );
 }

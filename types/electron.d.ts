@@ -5,6 +5,8 @@ interface ElectronAPI {
   hideWindow: () => void;
   showWindow: () => void;
   setWindowSize: (expanded: boolean) => void;
+  checkShortcutRegistration: () => Promise<boolean>;
+  refreshShortcuts: () => Promise<boolean>;
 }
 
 interface Window {

@@ -119,4 +119,77 @@ div[data-nextjs-compiler] {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
+}
+
+/* Microphone dropdown animations and styling */
+.mic-dropdown-container {
+  position: relative;
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -ms-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.mic-dropdown-container .absolute {
+  animation: fadeIn 0.2s ease-in-out;
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  z-index: 50;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Custom scrollbar for the dropdown */
+.max-h-40::-webkit-scrollbar {
+  width: 5px;
+}
+
+.max-h-40::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.max-h-40::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 4px;
+}
+
+.max-h-40::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Add subtle hover effect to the mic button */
+.mic-subtle-animation {
+  transition: all 0.3s ease;
+}
+
+.mic-subtle-animation:hover {
+  filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.5));
+}
+
+/* Visualizer animations */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeSlideUp 0.5s ease-out forwards;
 } 

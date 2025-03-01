@@ -12,8 +12,10 @@ A Windows desktop application that converts your voice to text with a simple key
 
 - **Desktop Integration**: Runs as a standalone desktop app with Electron
 - **Elegant Minimal UI**: Clean and unobtrusive interface that stays out of your way
-- **Keyboard Shortcut Control**: Press `Ctrl + Alt + R` to start recording, `Esc` to stop
+- **Keyboard Shortcut Control**: Press `Ctrl + Shift + R` to start recording, `Esc` to stop
+- **Microphone Selection**: Choose your preferred audio input device from a dropdown menu
 - **Real-time Audio Visualization**: Dynamic audio visualizer displays your voice input
+- **Intelligent Error Handling**: Clear notifications for microphone issues or silence detection
 - **AI-Powered Transcription**: Uses OpenAI's Whisper API for accurate speech-to-text
 - **Automatic Clipboard Copy**: Transcribed text is automatically copied to your clipboard
 - **Smooth Animations**: Polished transitions and state changes for excellent UX
@@ -21,7 +23,7 @@ A Windows desktop application that converts your voice to text with a simple key
 
 ## Demo
 
-The application appears as a sleek status indicator at the bottom of your screen. When recording, an elegant audio visualizer appears. After transcription, the text is displayed with a typing animation and automatically copied to your clipboard.
+The application appears as a sleek status indicator at the bottom of your screen. When recording, an elegant audio visualizer appears above the controls. After transcription, the text is displayed with a typing animation and automatically copied to your clipboard.
 
 ## Prerequisites
 
@@ -71,10 +73,16 @@ The application appears as a sleek status indicator at the bottom of your screen
 
 ### Keyboard Controls
 
-- Press `Ctrl + Alt + R` to start recording
+- Press `Ctrl + Shift + R` to start recording
 - Speak into your microphone
 - Press `Esc` to stop recording
 - The text will be automatically transcribed and copied to your clipboard
+
+### Microphone Selection
+
+- Click on the microphone icon dropdown in the status bar
+- Select your preferred input device from the list
+- The app will remember your selection for future sessions
 
 ## How It Works
 
@@ -87,11 +95,12 @@ VibeTranscribe combines several technologies:
 5. **Global Keyboard Shortcuts**: Enables system-wide control
 
 The application flow:
-1. User activates recording with keyboard shortcut
-2. Sleek UI shows recording status with animated visualizer
-3. Upon stopping, audio is sent to OpenAI's Whisper API
-4. Transcribed text appears with a typing animation
-5. Text is automatically copied to clipboard for immediate use
+1. User selects their preferred microphone
+2. User activates recording with keyboard shortcut
+3. Sleek UI shows recording status with animated visualizer above the controls
+4. Upon stopping, audio is sent to OpenAI's Whisper API
+5. Transcribed text appears with a typing animation
+6. Text is automatically copied to clipboard for immediate use
 
 ## Project Structure
 
@@ -109,12 +118,14 @@ VibeTranscribe/
 │   ├── preload.ts             # Preload script for IPC
 │── utils/
 │   ├── keyboardShortcuts.ts   # Defines shortcut activation
+│   ├── audioDevices.ts        # Handles microphone enumeration
 │── app/
 │   ├── api/
 │   │   ├── transcribe/
 │   │   │   ├── route.ts       # API endpoint for transcription
 │   ├── page.tsx               # Main UI page
 │   ├── globals.css            # Global styles
+│   ├── electron.css           # Electron-specific styles
 │── types/
 │   ├── electron.d.ts          # Electron type definitions
 ```
@@ -123,14 +134,18 @@ VibeTranscribe/
 
 - The application uses Electron for desktop integration
 - UI components are designed to be minimal and unobtrusive
+- Audio visualization appears above recording controls with proper spacing
 - Smooth transitions enhance the user experience
+- Error handling provides feedback for common audio issues
 - Global keyboard shortcuts work system-wide, even when the app is in the background
 
 ## Troubleshooting
 
 - **Microphone Access**: Ensure you've granted microphone permissions
+- **No Audio Detected**: If you see this warning, check if your microphone is muted or working properly
 - **API Key**: Verify your OpenAI API key is correctly set in the `.env` file
 - **Keyboard Shortcuts**: Make sure no other application is using the same keyboard shortcuts
+- **Microphone Selection**: If your microphone isn't listed, try reconnecting it or restarting the app
 
 ## License
 
