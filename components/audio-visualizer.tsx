@@ -21,6 +21,11 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
   const [noAudioDetected, setNoAudioDetected] = useState(false)
   const noAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const silenceDetectionCountRef = useRef(0)
+  const connectionAttemptsRef = useRef(0)
+  const maxConnectionAttempts = 3
+  
+  // New state for retrying connection
+  const [isRetrying, setIsRetrying] = useState(false)
 
   useEffect(() => {
     let audioContext: AudioContext | null = null
@@ -36,6 +41,7 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
         setAudioError(null)
         setNoAudioDetected(false)
         silenceDetectionCountRef.current = 0
+        setIsRetrying(false)
         
         if (noAudioTimeoutRef.current) {
           clearTimeout(noAudioTimeoutRef.current)
@@ -60,10 +66,17 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
           audioConstraints.deviceId = { exact: selectedMicDevice }
         }
         
+        // Increment connection attempts
+        connectionAttemptsRef.current += 1
+        console.log(`Audio connection attempt: ${connectionAttemptsRef.current}`)
+        
         // Get user media with selected device if specified
         mediaStream = await navigator.mediaDevices.getUserMedia({ 
           audio: audioConstraints
         })
+        
+        // Connection successful, reset counter
+        connectionAttemptsRef.current = 0
         
         // Create source from media stream
         source = audioContext.createMediaStreamSource(mediaStream)
@@ -99,7 +112,7 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
             silenceDetectionCountRef.current++
             
             // If silence persists for several checks, show warning
-            if (silenceDetectionCountRef.current > 10 && !noAudioDetected) {
+            if (silenceDetectionCountRef.current > 6 && !noAudioDetected) {
               console.warn("No audio detected from microphone")
               setNoAudioDetected(true)
             }
@@ -124,10 +137,24 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
           } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
             setAudioError("Could not access microphone. It may be in use by another application.")
           } else {
-            setAudioError("Error accessing microphone: " + error.message)
+            setAudioError(`Error accessing microphone: ${error.message}`)
           }
         } else {
           setAudioError("Error setting up audio visualization")
+        }
+        
+        // Check if we should retry
+        if (connectionAttemptsRef.current < maxConnectionAttempts) {
+          setIsRetrying(true)
+          console.log(`Retrying connection (attempt ${connectionAttemptsRef.current} of ${maxConnectionAttempts})...`)
+          // Retry after a short delay
+          noAudioTimeoutRef.current = setTimeout(() => {
+            setIsRetrying(false)
+            setupAudioContext()
+          }, 1500)
+        } else {
+          console.warn(`Maximum connection attempts (${maxConnectionAttempts}) reached. Giving up.`)
+          connectionAttemptsRef.current = 0
         }
       }
     }
@@ -271,6 +298,8 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
       // Reset error states
       setAudioError(null)
       setNoAudioDetected(false)
+      setIsRetrying(false)
+      connectionAttemptsRef.current = 0
     }
 
     if (isRecording) {
@@ -281,7 +310,25 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
 
     // Cleanup on unmount
     return cleanup
-  }, [isRecording, selectedMicDevice, noAudioDetected])
+  }, [isRecording, selectedMicDevice])
+
+  // Custom function to retry connection manually
+  const handleRetryConnection = () => {
+    if (!isRecording) return
+    
+    // Reset errors and counters
+    setAudioError(null)
+    connectionAttemptsRef.current = 0
+    
+    // Setup audio context again
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
+    
+    // Trigger a re-render to restart the effect
+    setIsRetrying(false)
+  }
 
   return (
     <div className="fixed bottom-10 left-0 right-0 flex flex-col justify-center items-center p-4 pointer-events-none">
@@ -306,26 +353,47 @@ export default function AudioVisualizer({ isRecording, selectedMicDevice }: Audi
             {/* Subtle glow effect */}
             <div className="absolute -inset-1 bg-violet-500/5 blur-xl rounded-full pointer-events-none opacity-50"></div>
             
-            {/* Error message */}
+            {/* Error message - smaller and more elegant */}
             {audioError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/80 backdrop-blur-sm">
-                <div className="text-center px-4 py-3 rounded-lg bg-red-500/20 border border-red-500/40 max-w-xs">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-2 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-auto">
+                <div className="px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-red-500/40 shadow-lg backdrop-blur-md flex items-center space-x-2 mx-2 max-w-[90%] transform transition-all duration-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-red-300 text-sm">{audioError}</p>
+                  <p className="text-red-300 text-xs font-medium truncate">{audioError}</p>
+                  
+                  {/* Retry button */}
+                  <button 
+                    onClick={handleRetryConnection} 
+                    className="ml-1 px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 rounded text-xs text-red-300 transition-colors"
+                  >
+                    Retry
+                  </button>
                 </div>
               </div>
             )}
             
-            {/* No audio detected warning */}
+            {/* No audio detected warning - smaller, non-intrusive */}
             {noAudioDetected && !audioError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/70 backdrop-blur-sm">
-                <div className="text-center px-4 py-3 rounded-lg bg-amber-500/20 border border-amber-500/40 max-w-xs animate-pulse">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto mb-2 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                <div className="px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-amber-500/40 shadow-lg backdrop-blur-md flex items-center space-x-2 mx-2 max-w-[90%] transform transition-all duration-300">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-400 flex-shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 01.001-7.072m-2.828 9.9a9 9 0 010-12.728" />
                   </svg>
-                  <p className="text-amber-300 text-sm">No audio detected. Please check if your microphone is working properly.</p>
+                  <p className="text-amber-300 text-xs font-medium">No audio detected from microphone</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Connecting/retrying indicator */}
+            {isRetrying && !audioError && !noAudioDetected && (
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                <div className="px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-blue-500/40 shadow-lg backdrop-blur-md flex items-center space-x-2 mx-2 transform transition-all duration-300">
+                  <div className="w-4 h-4 relative flex-shrink-0">
+                    <div className="absolute w-full h-full border-2 border-blue-400 rounded-full animate-ping opacity-75"></div>
+                    <div className="absolute w-full h-full border-2 border-blue-500 rounded-full animate-spin"></div>
+                  </div>
+                  <p className="text-blue-300 text-xs font-medium">Connecting to microphone...</p>
                 </div>
               </div>
             )}

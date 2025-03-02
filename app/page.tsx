@@ -92,6 +92,70 @@ export default function Home() {
     loadAudioDevices();
   }, [isMounted, selectedMicDevice]);
 
+  // Handle mouse interaction for Electron click-through behavior
+  useEffect(() => {
+    if (!isMounted || !isElectronMode || !window.electronAPI) return;
+    
+    // Function to handle mouse enter on interactive elements
+    const handleMouseEnter = () => {
+      window.electronAPI.sendMouseEvent('enter');
+    };
+    
+    // Function to handle mouse leave on interactive elements
+    const handleMouseLeave = () => {
+      window.electronAPI.sendMouseEvent('leave');
+    };
+    
+    // Add mouse event listeners to all interactive elements
+    const addInteractiveListeners = () => {
+      // Get all interactive elements
+      const interactiveElements = document.querySelectorAll(
+        '.status-bar-container, .mic-dropdown-container, .transcription-container, button'
+      );
+      
+      // Add event listeners to each element
+      interactiveElements.forEach(el => {
+        el.addEventListener('mouseenter', handleMouseEnter);
+        el.addEventListener('mouseleave', handleMouseLeave);
+      });
+      
+      // Return cleanup function
+      return () => {
+        interactiveElements.forEach(el => {
+          el.removeEventListener('mouseenter', handleMouseEnter);
+          el.removeEventListener('mouseleave', handleMouseLeave);
+        });
+      };
+    };
+    
+    // We need to wait a bit for the DOM to be fully rendered
+    const setupTimer = setTimeout(() => {
+      const cleanup = addInteractiveListeners();
+      
+      // Set up a mutation observer to handle dynamically added elements
+      const observer = new MutationObserver(() => {
+        cleanup(); // Clean up existing listeners
+        addInteractiveListeners(); // Re-add listeners to updated DOM
+      });
+      
+      // Start observing the document body for DOM changes
+      observer.observe(document.body, { 
+        childList: true,
+        subtree: true
+      });
+      
+      // Return cleanup function for the effect
+      return () => {
+        cleanup();
+        observer.disconnect();
+      };
+    }, 1000);
+    
+    return () => {
+      clearTimeout(setupTimer);
+    };
+  }, [isMounted, isElectronMode]);
+
   // Close mic dropdown when clicking outside
   useEffect(() => {
     if (!showMicDropdown) return;
@@ -436,7 +500,7 @@ export default function Home() {
         )}
         
         {/* Status indicator - centered at the bottom */}
-        <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center pb-2 z-20">
+        <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center pb-2 z-20 status-bar-container">
           <div className="transform transition-all duration-300 ease-in-out rounded-full bg-neutral-800/80 backdrop-blur-md px-4 py-2.5 flex items-center space-x-2.5 shadow-lg border border-violet-500/20 hover:bg-neutral-800/90 hover:border-violet-500/30">
             {isRecording ? (
               <>

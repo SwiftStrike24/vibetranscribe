@@ -31,6 +31,15 @@ export default function Transcriber({
     
     console.log("Starting transcription process with blob size:", blob.size);
     console.log("Blob type:", blob.type);
+    
+    // Skip transcription for empty or very small blobs - indicates no meaningful audio
+    const minValidSize = 1000; // 1KB as minimum valid size
+    if (blob.size < minValidSize) {
+      console.warn("Audio blob is too small, likely contains no meaningful audio. Skipping API call.");
+      onTranscriptionComplete("No meaningful audio detected. Please try speaking louder or check your microphone.");
+      return;
+    }
+    
     setIsTranscribing(true);
     setError(null);
     onTranscriptionStart();

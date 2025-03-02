@@ -17,8 +17,8 @@ interface CustomBrowserWindow extends BrowserWindow {
 
 let mainWindow: CustomBrowserWindow | null = null;
 // Default window size
-// We use a single constant height to prevent flickering during transitions
-const WINDOW_HEIGHT = 540; // Height for the window (previously had collapsible behavior)
+// We'll keep the height but make it click-through in transparent areas
+const WINDOW_HEIGHT = 540;
 
 // Keep track of last resize request time and state
 let lastResizeTime = 0;
@@ -145,6 +145,9 @@ function createWindow() {
     // Set window properties
     mainWindow.setAlwaysOnTop(true, 'screen-saver', 2);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    
+    // Enable click-through for transparent parts of the window
+    mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
     // Load the URL
     const startUrl = process.env.ELECTRON_START_URL 
@@ -208,13 +211,53 @@ function createWindow() {
 
     // Load the app URL - but don't show the window yet
     mainWindow.loadURL(startUrl);
-
-    // Make window draggable by background
-    mainWindow.setIgnoreMouseEvents(false);
+    
+    // Set up IPC listener for interactive regions
+    setupRegionBasedInteractivity();
   } catch (error) {
     console.error('Error creating window:', error);
     hasCreatedWindow = false;
   }
+}
+
+// Setup region-based interactivity (clickable areas)
+function setupRegionBasedInteractivity() {
+  if (!mainWindow) return;
+  
+  // Listen for messages from the renderer about interactive regions
+  ipcMain.on('update-interactive-region', (_event, region) => {
+    if (!mainWindow) return;
+    
+    if (region && typeof region === 'object') {
+      // If renderer sends a region, make the window click-through except in specified areas
+      try {
+        if (region.reset) {
+          // Reset to full click-through mode with mouse move detection
+          mainWindow.setIgnoreMouseEvents(true, { forward: true });
+          console.log("Reset to full click-through mode");
+        } else {
+          // Enable click-through except in specified regions
+          mainWindow.setIgnoreMouseEvents(false);
+          console.log("Interactive mode enabled");
+        }
+      } catch (error) {
+        console.error("Error updating interactive regions:", error);
+      }
+    }
+  });
+  
+  // Listen for mouse enter/leave events from renderer
+  ipcMain.on('mouse-event', (_event, type) => {
+    if (!mainWindow) return;
+    
+    if (type === 'enter') {
+      // Mouse entered an interactive element - disable click-through
+      mainWindow.setIgnoreMouseEvents(false);
+    } else if (type === 'leave') {
+      // Mouse left interactive elements - enable click-through with forwarding
+      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
+  });
 }
 
 // Check if a shortcut is already registered by another application

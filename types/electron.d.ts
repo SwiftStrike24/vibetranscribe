@@ -7,6 +7,8 @@ interface ElectronAPI {
   setWindowSize: (expanded: boolean) => void;
   checkShortcutRegistration: () => Promise<boolean>;
   refreshShortcuts: () => Promise<boolean>;
+  sendMouseEvent: (type: 'enter' | 'leave') => void;
+  updateInteractiveRegion: (region: { reset?: boolean } | null) => void;
 }
 
 interface Window {
