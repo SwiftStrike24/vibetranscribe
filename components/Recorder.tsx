@@ -151,7 +151,41 @@ export default function Recorder({ onRecordingComplete, isRecording, setIsRecord
       
       // Add deviceId constraint if a specific microphone is selected
       if (selectedMicDevice) {
-        console.log("Using selected microphone device:", selectedMicDevice);
+        console.log("Using selected microphone device ID:", selectedMicDevice);
+        
+        // Get the full device info from the OS/browser
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const selectedDevice = devices.find(device => device.deviceId === selectedMicDevice);
+          if (selectedDevice) {
+            console.log("label :", JSON.stringify(selectedDevice.label));
+            
+            // Extract a display name from the label for logging
+            let displayName = selectedDevice.label;
+            // Remove prefix like "Default - " or "Communications - "
+            displayName = displayName.replace(/^(Default|Communications) - /, '');
+            // Remove "Microphone" prefix if present
+            displayName = displayName.replace(/^Microphone\s+/, '');
+            // Try to extract the device name from parentheses
+            const deviceNameMatch = displayName.match(/\(([^)]+)\)/);
+            if (deviceNameMatch && !deviceNameMatch[1].match(/^[\da-fA-F]{2,4}:[\da-fA-F]{2,4}$/)) {
+              displayName = deviceNameMatch[1];
+            } else {
+              // Remove hardware ID
+              displayName = displayName.replace(/\s*\([\da-fA-F]{2,4}:[\da-fA-F]{2,4}\)$/, '');
+              displayName = displayName.replace(/\s*\([^)]*\)$/, '');
+            }
+            console.log("display name :", displayName.trim());
+            
+            // If in Electron mode, send to main process for terminal logging
+            if (typeof window !== 'undefined' && window.electronAPI) {
+              window.electronAPI.logMicrophoneInfo(selectedDevice.label);
+            }
+          }
+        } catch (error) {
+          console.error("Error getting device label:", error);
+        }
+        
         audioConstraints.deviceId = { exact: selectedMicDevice };
       }
       

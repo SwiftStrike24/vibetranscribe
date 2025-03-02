@@ -224,9 +224,22 @@ export default function Home() {
   // Select a microphone device
   const selectMicDevice = useCallback((deviceId: string) => {
     console.log("Selecting microphone device:", deviceId);
+    
+    // Find the device in our list to get its label
+    const selectedDevice = audioDevices.find(device => device.deviceId === deviceId);
+    if (selectedDevice) {
+      console.log("label :", JSON.stringify(selectedDevice.label));
+      console.log("display name :", selectedDevice.displayName);
+      
+      // If in Electron mode, log to terminal
+      if (isElectronMode && window.electronAPI) {
+        window.electronAPI.logMicrophoneInfo(selectedDevice.label);
+      }
+    }
+    
     setSelectedMicDevice(deviceId);
     setShowMicDropdown(false);
-  }, []);
+  }, [audioDevices, isElectronMode]);
 
   // Effect to track when there's been no transcription activity for a while
   const [shouldRenderTranscription, setShouldRenderTranscription] = useState(false);
@@ -593,7 +606,7 @@ export default function Home() {
                                       <line x1="12" y1="19" x2="12" y2="22" />
                                       <line x1="8" y1="22" x2="16" y2="22" />
                                     </svg>
-                                    <span className="truncate">{device.label}</span>
+                                    <span className="truncate">{device.displayName}</span>
                                     {device.isDefault && (
                                       <span className="ml-1 text-xs text-violet-400">(Default)</span>
                                     )}
@@ -672,7 +685,7 @@ export default function Home() {
                   <line x1="12" y1="19" x2="12" y2="22" />
                   <line x1="8" y1="22" x2="16" y2="22" />
                 </svg>
-                {audioDevices.find(d => d.deviceId === selectedMicDevice)?.label || 'Select Microphone'}
+                {audioDevices.find(d => d.deviceId === selectedMicDevice)?.displayName || 'Select Microphone'}
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
@@ -700,7 +713,7 @@ export default function Home() {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
                                 </svg>
-                                <span className="truncate">{device.label}</span>
+                                <span className="truncate">{device.displayName}</span>
                                 {device.isDefault && (
                                   <span className="ml-1 text-xs text-violet-400">(Default)</span>
                                 )}

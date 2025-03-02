@@ -458,6 +458,31 @@ function setupIPC() {
     // Notify renderer that shortcuts have been refreshed
     event.reply('shortcuts-refreshed');
   });
+  
+  // Add handler for microphone info logging
+  ipcMain.on('log-microphone-info', (_event, label: string) => {
+    // Extract a clean display name from the label
+    let displayName = label;
+    // Remove prefix like "Default - " or "Communications - "
+    displayName = displayName.replace(/^(Default|Communications) - /, '');
+    // Remove "Microphone" prefix if present
+    displayName = displayName.replace(/^Microphone\s+/, '');
+    // Try to extract the device name from parentheses
+    const deviceNameMatch = displayName.match(/\(([^)]+)\)/);
+    if (deviceNameMatch && !deviceNameMatch[1].match(/^[\da-fA-F]{2,4}:[\da-fA-F]{2,4}$/)) {
+      displayName = deviceNameMatch[1];
+    } else {
+      // Remove hardware ID
+      displayName = displayName.replace(/\s*\([\da-fA-F]{2,4}:[\da-fA-F]{2,4}\)$/, '');
+      displayName = displayName.replace(/\s*\([^)]*\)$/, '');
+    }
+    displayName = displayName.trim();
+
+    console.log("\n----- MICROPHONE INFO -----");
+    console.log(`full label : ${label}`);
+    console.log(`display name : ${displayName}`);
+    console.log("---------------------------\n");
+  });
 }
 
 // When Electron is ready, create window

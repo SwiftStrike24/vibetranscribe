@@ -9,6 +9,7 @@ interface ElectronAPI {
   refreshShortcuts: () => Promise<boolean>;
   sendMouseEvent: (type: 'enter' | 'leave') => void;
   updateInteractiveRegion: (region: { reset?: boolean } | null) => void;
+  logMicrophoneInfo: (label: string) => void;
 }
 
 interface Window {

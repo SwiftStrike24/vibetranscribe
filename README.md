@@ -13,7 +13,7 @@ A Windows desktop application that converts your voice to text with a simple key
 - **Desktop Integration**: Runs as a standalone desktop app with Electron
 - **Elegant Minimal UI**: Clean and unobtrusive interface that stays out of your way
 - **Keyboard Shortcut Control**: Press `Ctrl + Shift + R` to start recording, `Esc` to stop
-- **Microphone Selection**: Choose your preferred audio input device from a dropdown menu
+- **Smart Microphone Selection**: Choose from a clean list of microphones with user-friendly names
 - **Real-time Audio Visualization**: Dynamic audio visualizer displays your voice input
 - **Intelligent Error Handling**: Clear notifications for microphone issues or silence detection
 - **AI-Powered Transcription**: Uses OpenAI's Whisper API for accurate speech-to-text
@@ -81,7 +81,10 @@ The application appears as a sleek status indicator at the bottom of your screen
 ### Microphone Selection
 
 - Click on the microphone icon dropdown in the status bar
-- Select your preferred input device from the list
+- Select your preferred input device from the list with clean, user-friendly device names
+- No more confusing technical labels or duplicate entries
+- The app intelligently filters and displays only unique microphones
+- Default devices are clearly marked and prioritized at the top of the list
 - The app will remember your selection for future sessions
 
 ## How It Works
@@ -123,7 +126,7 @@ VibeTranscribe/
 │   ├── api/
 │   │   ├── transcribe/
 │   │   │   ├── route.ts       # API endpoint for transcription
-│   ├── page.tsx               # Main UI page
+│   │   ├── page.tsx               # Main UI page
 │   ├── globals.css            # Global styles
 │   ├── electron.css           # Electron-specific styles
 │── types/

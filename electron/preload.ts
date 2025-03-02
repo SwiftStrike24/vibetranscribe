@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateInteractiveRegion: (region: { reset?: boolean } | null) => {
     ipcRenderer.send('update-interactive-region', region);
   },
+  logMicrophoneInfo: (label: string) => {
+    ipcRenderer.send('log-microphone-info', label);
+  },
 
   // Receive methods (from main to renderer)
   onStartRecording: (callback: () => void) => {
