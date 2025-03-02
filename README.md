@@ -1,12 +1,19 @@
 # VibeTranscribe
 
-A Windows desktop application that converts your voice to text with a simple keyboard shortcut and automatically copies it to your clipboard. Built with Electron and Next.js.
+<p align="center">
+  <img src="./public/icon.ico" width="120" height="120" alt="VibeTranscribe Logo" style="filter: drop-shadow(0 0 10px rgba(138, 43, 226, 0.6));" />
+</p>
 
-![VibeTranscribe](https://img.shields.io/badge/VibeTranscribe-Voice%20to%20Text-8A2BE2)
-![Next.js](https://img.shields.io/badge/Next.js-15.1.7-black)
-![React](https://img.shields.io/badge/React-19.0.0-blue)
-![Electron](https://img.shields.io/badge/Electron-28.1.0-47848F)
-![OpenAI](https://img.shields.io/badge/OpenAI-Whisper%20API-green)
+<h3 align="center">Voice to Text, Instantly</h3>
+<p align="center">A Windows desktop application that converts your voice to text with a simple keyboard shortcut and automatically copies it to your clipboard. Built with Electron and Next.js.</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/VibeTranscribe-Voice%20to%20Text-8A2BE2" alt="VibeTranscribe" />
+  <img src="https://img.shields.io/badge/Next.js-15.1.7-black" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19.0.0-blue" alt="React" />
+  <img src="https://img.shields.io/badge/Electron-28.1.0-47848F" alt="Electron" />
+  <img src="https://img.shields.io/badge/OpenAI-Whisper%20API-green" alt="OpenAI" />
+</p>
 
 ## Features
 

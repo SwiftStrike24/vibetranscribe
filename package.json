@@ -69,6 +69,15 @@
       ],
       "icon": "public/icon.ico"
     },
+    "mac": {
+      "icon": "public/icon.ico",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "icon": "public/icon.ico",
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

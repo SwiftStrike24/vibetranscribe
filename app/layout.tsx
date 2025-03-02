@@ -19,6 +19,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VibeTranscribe",
   description: "Voice to text transcription with keyboard shortcuts",
+  icons: {
+    icon: [
+      { url: '/icon.ico', sizes: 'any' }
+    ],
+    apple: '/icon.ico',
+  },
 };
 
 export default function RootLayout({

@@ -127,6 +127,7 @@ function createWindow() {
       show: false,
       type: 'panel',
       focusable: true,
+      icon: path.join(__dirname, '../public/icon.ico'),
       fullscreenable: false,
       minimizable: false,
       maximizable: false,
